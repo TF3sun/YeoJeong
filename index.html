@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>국내 여행지 랜덤 추첨기</title>
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --naver-color: #03C75A;
+            --youtube-color: #FF0000;
+            --bg-color: #f8fafc;
+        }
+        body { 
+            font-family: 'Pretendard', -apple-system, sans-serif; 
+            background-color: var(--bg-color); 
+            display: flex; justify-content: center; align-items: center; 
+            height: 100vh; margin: 0; 
+        }
+        .container { 
+            background: white; padding: 2rem; border-radius: 1.5rem; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; 
+            width: 90%; max-width: 420px; 
+        }
+        h1 { color: #1e293b; font-size: 1.5rem; margin-bottom: 1rem; }
+        
+        .option-group {
+            display: flex;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .option-label {
+            flex: 1;
+            padding: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #64748b;
+            cursor: pointer;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+        }
+        input[type="radio"] { display: none; }
+        input[type="radio"]:checked + .option-label {
+            background: white;
+            color: var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        #result-display {
+            min-height: 160px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            border: 2px dashed #cbd5e1;
+            border-radius: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1.5rem 1rem;
+            word-break: keep-all;
+            background: #ffffff;
+        }
+
+        .btn-draw {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: transform 0.1s, background-color 0.2s;
+            width: 100%;
+        }
+        .btn-draw:active { transform: scale(0.95); }
+        .btn-draw:disabled { background-color: #94a3b8; cursor: not-allowed; }
+
+        .link-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        .btn-link {
+            flex: 1;
+            padding: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-naver { background-color: var(--naver-color); }
+        .btn-youtube { background-color: var(--youtube-color); }
+
+        .hint-text { font-size: 0.85rem; color: #64748b; margin-bottom: 10px; font-weight: 400; }
+        .loading-text { font-size: 1rem; color: #94a3b8; font-weight: 400; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🌍 어디로 떠날까요?</h1>
+    
+    <div class="option-group">
+        <input type="radio" id="opt-national" name="region-option" value="national" checked>
+        <label for="opt-national" class="option-label">전국 시/군</label>
+        
+        <input type="radio" id="opt-ulsan" name="region-option" value="ulsan">
+        <label for="opt-ulsan" class="option-label">울산 읍/면/동</label>
+    </div>
+
+    <div id="result-display">
+        <span class="loading-text">추첨 버튼을 눌러주세요!</span>
+    </div>
+    <button class="btn-draw" onclick="fetchTravelDest()">추첨 시작!</button>
+</div>
+
+<script>
+    const display = document.getElementById('result-display');
+    const btn = document.querySelector('.btn-draw');
+    const dummyPlaces = ["서울특별시", "울산 남구 삼산동", "부산 해운대구", "경기도 수원시", "울산 북구 양정동", "강원도 강릉시"];
+
+    async function fetchTravelDest() {
+        btn.disabled = true;
+        display.style.border = "2px dashed #cbd5e1";
+        
+        const selectedOption = document.querySelector('input[name="region-option"]:checked').value;
+
+        // 1. 롤링 애니메이션 가동
+        let count = 0;
+        const shuffleInterval = setInterval(() => {
+            const dummyIndex = Math.floor(Math.random() * dummyPlaces.length);
+            display.innerHTML = `<span style="color: #94a3b8">${dummyPlaces[dummyIndex]}</span>`;
+            count++;
+        }, 35);
+
+        try {
+            // 2. 외부 백엔드 API 연동
+            const response = await fetch(`/api/draw?option=${selectedOption}`);
+            if (!response.ok) throw new Error("서버 통신 에러");
+            
+            const data = await response.json();
+            
+            // 1초 후 정답 매핑 및 확정
+            setTimeout(() => {
+                clearInterval(shuffleInterval);
+                finalizeSelection(data.destination);
+            }, 1000);
+
+        } catch (error) {
+            clearInterval(shuffleInterval);
+            display.innerHTML = `<span style="color: #ef4444; font-size:1rem;">에러가 발생했습니다.<br>다시 시도해주세요.</span>`;
+            btn.disabled = false;
+        }
+    }
+
+    function finalizeSelection(selected) {
+        const naverUrl = `https://map.naver.com/v5/search/${encodeURIComponent(selected)}`;
+        const youtubeUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(selected + " 여행")}`;
+        
+        display.style.border = "2px solid var(--primary-color)";
+        display.innerHTML = `
+            <div class="hint-text">축하합니다! 오늘의 목적지는?</div>
+            <div style="margin-bottom: 10px;">📍 ${selected}</div>
+            <div class="link-group">
+                <a href="${naverUrl}" target="_blank" class="btn-link btn-naver">네이버 지도</a>
+                <a href="${youtubeUrl}" target="_blank" class="btn-link btn-youtube">유튜브 검색</a>
+            </div>
+        `;
+        btn.disabled = false;
+    }
+</script>
+
+</body>
+</html>
